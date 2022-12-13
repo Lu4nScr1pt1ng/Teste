@@ -1,10 +1,13 @@
-﻿using Newtonsoft.Json;
+﻿using Dapper;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Data;
 using System.Data.SqlClient;
 using System.IO;
+using System.Linq;
 using System.Net;
+using System.Runtime.ConstrainedExecution;
 using System.Text.RegularExpressions;
 
 namespace TesteCandidato
@@ -56,31 +59,32 @@ namespace TesteCandidato
             //);
             string cep;
             string result = string.Empty;
-            void ObterCEP()
+            bool valid = false;
+            void ObterCep()
             {
                 Console.WriteLine("Digite um CEP para ser buscado:");
 
                 cep = Console.ReadLine();
-                ValidaCEP(cep);
+                ValidaCep();
             }
-            ObterCEP();
+            ObterCep();
 
             //TODO: Implementar forma de fazer o usuário poder errar várias vezes o CEP informado
             //TODO: Melhorar validação do CEP.
-            bool ValidaCEP(string cepvalid)
+            bool ValidaCep()
             {
                 // Remover .
-                cepvalid = cepvalid.Replace(".", "");
+                cep = cep.Replace(".", "");
                 // Remover -
-                cepvalid = cepvalid.Replace("-", "");
+                cep = cep.Replace("-", "");
                 // Remover espaços
-                cepvalid = cepvalid.Replace(" ", "");
+                cep = cep.Replace(" ", "");
 
                 Regex Rgx = new Regex(@"^\d{8}$");
-                if (!Rgx.IsMatch(cepvalid))
+                if (!Rgx.IsMatch(cep))
                 {
                     Console.WriteLine("CEP Invalido!");
-                    ObterCEP();
+                    ObterCep();
                     return false;
                 }
                 else
@@ -108,7 +112,7 @@ namespace TesteCandidato
                     result = reader.ReadToEnd();
                 } else
                 {
-                    throw new Exception("Erro requisição API");
+                    throw new Exception("Erro na requisição API");
                 }
             }
             catch(Exception ex)
@@ -125,117 +129,116 @@ namespace TesteCandidato
             if(jsonRetorno.erro == true)
             {
                 Console.WriteLine("CEP não encontrado na API");
+            } else
+            {
+                valid = true;
             }
-
 
             //TODO: Validar CEP existente
 
             // conexão com database localdb
             string connectionString = "Data Source=(localdb)\\MSSQLLocalDB;Initial Catalog=CEP;Integrated Security=True;Connect Timeout=30;Encrypt=False;TrustServerCertificate=True;ApplicationIntent=ReadWrite;MultiSubnetFailover=False;";
-            SqlConnection connection = new SqlConnection(connectionString);
+            var db = new SqlConnection(connectionString);
 
+            //Abrir conexão
+            db.Open();
 
-            string query = "INSERT INTO [dbo].[CEP] ([cep], [logradouro], [complemento], [bairro], [localidade], [uf], [unidade], [ibge], [gia]) VALUES (";
-            query = query + "'" + jsonRetorno["cep"] + "'";
-            query = query + ",'" + jsonRetorno["logradouro"] + "'";
-            query = query + ",'" + jsonRetorno["complemento"] + "'";
-            query = query + ",'" + jsonRetorno["bairro"] + "'";
-            query = query + ",'" + jsonRetorno["localidade"] + "'";
-            query = query + ",'" + jsonRetorno["uf"] + "'";
-            query = query + ",'" + jsonRetorno["unidade"] + "'";
-            query = query + ",'" + jsonRetorno["ibge"] + "'";
-            query = query + ",'" + jsonRetorno["gia"] + "'" + ")";
-
-            SqlCommand sqlCommand = new SqlCommand(query, connection);
-
-            sqlCommand.CommandType = CommandType.Text;
-
-            try
+            string queryFindOne = $"SELECT * FROM [CEP].[dbo].[CEP] WHERE cep = '{cep}'";
+            var exists = db.QueryFirstOrDefault(queryFindOne);
+            if(exists != null)
             {
-                connection.Open();
 
-                sqlCommand.ExecuteNonQuery();
-            }
-            catch (Exception ex)
+
+                Console.WriteLine("Esse CEP já existe no banco de dados");
+            } else
             {
-            }
-            finally
-            {
-                connection.Close();
-            }
+                // Query para adicionar novo CEP a DB
+                string queryAddCep = "INSERT INTO [dbo].[CEP] ([cep], [logradouro], [complemento], [bairro], [localidade], [uf], [unidade], [ibge], [gia]) VALUES (@cep, @logradouro, @complemento, @bairro, @localidade, @uf, @unidade, @ibge, @gia)";
+                var dp = new DynamicParameters();
+                dp.Add("@cep", cep);
+                dp.Add("@logradouro", $"{jsonRetorno.logradouro}");
+                dp.Add("@complemento", $"{jsonRetorno.complemento}");
+                dp.Add("@bairro", $"{jsonRetorno.bairro}");
+                dp.Add("@localidade", $"{jsonRetorno.localidade}");
+                dp.Add("@uf", $"{jsonRetorno.uf}");
+                // Unidade não existe no retorno da api mas deixei para obdecer o script de criação da DB
+                dp.Add("@unidade", $"{jsonRetorno.unidade}");
+                dp.Add("@ibge", $"{jsonRetorno.ibge}");
+                dp.Add("@gia", $"{jsonRetorno.gia}");
 
-            sqlCommand.Dispose();
-            connection.Close();
-            connection.Dispose();
-
-            //TODO: Retornar os dados do CEP infomado no início para o usuário
-
-            Console.WriteLine("Deseja visualizar todos os CEPs de alguma UF? Se sim, informar UF, se não, informar sair.");
-            string resposta = Console.ReadLine();
-
-            if (resposta == "sair")
-            {
-                return;
-            }
-
-            if (resposta.Length > 2)
-            {
-                Console.WriteLine("UF inválida");
-                resposta = Console.ReadLine();
-            }
-
-            if (resposta == "sair")
-            {
-                return;
-            }
-
-
-
-            connection = new SqlConnection("Data Source=(localdb)\\MSSQLLocalDB;Initial Catalog=CEP;Integrated Security=True;Connect Timeout=30;Encrypt=False;TrustServerCertificate=True;ApplicationIntent=ReadWrite;MultiSubnetFailover=False;");
-            sqlCommand = new SqlCommand("Select * from CEP", connection);
-
-            SqlDataAdapter adapter = new SqlDataAdapter();
-            DataSet ds = new DataSet();
-            DataView dv;
-            sqlCommand.CommandType = CommandType.Text;
-
-            try
-            {
-                connection.Open();
-                adapter.SelectCommand = sqlCommand;
-                adapter.Fill(ds, "Create DataView");
-                adapter.Dispose();
-
-                dv = ds.Tables[0].DefaultView;
-
-                for (int i = 0; i < dv.Count; i++)
+                // Executar Query
+                if(valid)
                 {
-                    if (dv[i]["uf"].ToString() == resposta)
+                    int res = db.Execute(queryAddCep, dp);
+                    if(res > 0)
                     {
-                        if (i == 0)
-                        {
-                            Console.Write(dv[i]["cep"]);
-                        }
-                        else
-                        {
-                            Console.Write(";" + dv[i]["cep"]);
-                        }
+                        Console.WriteLine("Novo CEP inserido no Database");
                     }
                 }
             }
-            catch (Exception ex)
+
+
+
+
+            //TODO: Retornar os dados do CEP infomado no início para o usuário
+
+            if (valid)
             {
-            }
-            finally
-            {
-                connection.Close();
+                string retornaInfoCep = $"CEP:{cep}\n";
+                retornaInfoCep += $"LOGRADOURO:{jsonRetorno.logradouro}\n";
+                retornaInfoCep += $"COMPLEMENTO:{jsonRetorno.complemento}\n";
+                retornaInfoCep += $"BAIRRO:{jsonRetorno.bairro}\n";
+                retornaInfoCep += $"LOCALIDADE:{jsonRetorno.localidade}\n";
+                retornaInfoCep += $"UF:{jsonRetorno.uf}\n";
+                retornaInfoCep += $"IBGE:{jsonRetorno.ibge}\n";
+                retornaInfoCep += $"GIA:{jsonRetorno.gia}";
+
+                Console.WriteLine("==================================================================");
+                Console.WriteLine(retornaInfoCep);
+                Console.WriteLine("==================================================================");
+
             }
 
-            sqlCommand.Dispose();
-            connection.Close();
-            connection.Dispose();
+            string resposta;
 
-            Console.ReadLine();
+            void ObterUf()
+            {
+                Console.WriteLine("Deseja visualizar todos os CEPs de alguma UF? Se sim, informar UF, se não, informar sair.");
+                resposta = Console.ReadLine();
+
+            }
+            ObterUf();
+
+
+            if (resposta == "sair")
+            {
+                return;
+            }
+
+            Regex RgxUf = new Regex(@"[aA-zZ]{2}");
+            if (RgxUf.IsMatch(resposta))
+            {
+                try
+                {
+                    var query = $"SELECT * FROM[CEP].[dbo].[CEP] WHERE uf = '{resposta}'";
+
+                    var queryFindAllCepByUf = db.Query(query).ToList();
+                    Console.WriteLine("==================================================================");
+                    queryFindAllCepByUf.ForEach(x => Console.WriteLine(x.cep + "-" + x.localidade));
+                    Console.ReadLine();
+                    return;
+                }
+                catch(Exception ex)
+                {
+                    Console.WriteLine("Ocorreu um erro ao buscar UF na DB");
+                    return;
+                }
+            } else
+            {
+                Console.WriteLine("UF Invalida!");
+                return;
+            }
+
         }
     }
 }
