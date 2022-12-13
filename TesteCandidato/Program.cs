@@ -147,8 +147,6 @@ namespace TesteCandidato
             var exists = db.QueryFirstOrDefault(queryFindOne);
             if(exists != null)
             {
-
-
                 Console.WriteLine("Esse CEP já existe no banco de dados");
             } else
             {
@@ -169,10 +167,18 @@ namespace TesteCandidato
                 // Executar Query
                 if(valid)
                 {
-                    int res = db.Execute(queryAddCep, dp);
-                    if(res > 0)
+                    try
                     {
-                        Console.WriteLine("Novo CEP inserido no Database");
+                        int res = db.Execute(queryAddCep, dp);
+                        if(res > 0)
+                        {
+                            Console.WriteLine("Novo CEP inserido no Database");
+                        }
+
+                    }
+                    catch(Exception ex)
+                    {
+                        Console.WriteLine("Ocorreu um erro ao tentar adicionar CEP a DB");
                     }
                 }
             }
