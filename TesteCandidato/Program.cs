@@ -33,6 +33,7 @@ namespace TesteCandidato
 
             // TODO: Fazer um projeto WEB
             // esse projeto WEB seria a parte de views? não entendi muito bem, se for pode entrar em contato que estou disposto a fazer.
+            // estarei fazendo uma minimal api no caso e consumindo com react
 
             //TODO: Perguntar se o usuário quer consultar se logradouro existe na base
             // conexão com database localdb
@@ -91,6 +92,9 @@ namespace TesteCandidato
 
             //TODO: Criar banco de dados - LocalDB com o nome CEP
             //TODO: Adicionar tabela conforme script abaixo
+            // CREATE DATABASE [CEP]
+            // GO
+
             //USE [CEP]
             //GO
 
