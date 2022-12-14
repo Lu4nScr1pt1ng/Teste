@@ -8,6 +8,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Runtime.ConstrainedExecution;
+using System.Runtime.InteropServices.WindowsRuntime;
 using System.Text.RegularExpressions;
 
 namespace TesteCandidato
@@ -33,6 +34,59 @@ namespace TesteCandidato
             //TODO: Fazer um projeto WEB
 
             //TODO: Perguntar se o usuário quer consultar se logradouro existe na base
+            // conexão com database localdb
+            string connectionString = "Data Source=(localdb)\\MSSQLLocalDB;Initial Catalog=CEP;Integrated Security=True;Connect Timeout=30;Encrypt=False;TrustServerCertificate=True;ApplicationIntent=ReadWrite;MultiSubnetFailover=False;";
+            var db = new SqlConnection(connectionString);
+
+            //Abrir conexão
+            try
+            {
+                db.Open();
+            }
+            catch(Exception ex)
+            {
+                throw new Exception("Ocorreu um erro ao tentar conectar com a db");
+            }
+
+            string reslog;
+            void ObterLogradouro()
+            {
+                Console.WriteLine("Desejar buscar se um logradouro existe no banco de dados? caso queira responda com 'sim', caso não responda com 'não'");
+
+                reslog = Console.ReadLine();
+            }
+            ObterLogradouro();
+
+            void ValidaResposta()
+            {
+                if(reslog == "sim")
+                {
+                    Console.WriteLine("Digite o logradouro desejado:");
+                    string logradouro = Console.ReadLine();
+
+                    string queryFindLog = $"SELECT * FROM [CEP].[dbo].[CEP] WHERE logradouro = '{logradouro}'";
+                    var response = db.QueryFirstOrDefault(queryFindLog);
+
+                    if (response != null)
+                    {
+                        Console.WriteLine("Esse logradouro já existe no banco de dados");
+                        Console.WriteLine("==================================================================");
+                        Console.WriteLine(response.logradouro + " - " + response.localidade + '-' + response.uf + " - " + response.cep);
+                        Console.WriteLine("==================================================================");
+                    } else
+                    {
+                        Console.WriteLine("Logradouro não encontrado no banco de dados");
+                        Console.WriteLine("==================================================================");
+                    }
+
+                    return;
+                }
+                else
+                {
+                    return;
+                }
+            }
+            ValidaResposta();
 
             //TODO: Criar banco de dados - LocalDB com o nome CEP
             //TODO: Adicionar tabela conforme script abaixo
@@ -57,6 +111,8 @@ namespace TesteCandidato
             //    [ibge]        INT            NULL,
             //    [gia]         NVARCHAR (500) NULL
             //);
+
+
             string cep;
             string result = string.Empty;
             bool valid = false;
@@ -135,13 +191,6 @@ namespace TesteCandidato
             }
 
             //TODO: Validar CEP existente
-
-            // conexão com database localdb
-            string connectionString = "Data Source=(localdb)\\MSSQLLocalDB;Initial Catalog=CEP;Integrated Security=True;Connect Timeout=30;Encrypt=False;TrustServerCertificate=True;ApplicationIntent=ReadWrite;MultiSubnetFailover=False;";
-            var db = new SqlConnection(connectionString);
-
-            //Abrir conexão
-            db.Open();
 
             string queryFindOne = $"SELECT * FROM [CEP].[dbo].[CEP] WHERE cep = '{cep}'";
             var exists = db.QueryFirstOrDefault(queryFindOne);
